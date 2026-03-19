@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: ['epic/*']
     types: [closed]
+  workflow_dispatch:
 
 jobs:
   check-epic-complete:
