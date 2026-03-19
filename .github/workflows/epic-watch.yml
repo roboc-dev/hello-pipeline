@@ -1,0 +1,16 @@
+name: Epic watch
+
+on:
+  pull_request:
+    branches: ['epic/*']
+    types: [closed]
+
+jobs:
+  check-epic-complete:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Epic watch stub
+        run: |
+          echo "Story merged to epic branch"
+          echo "Epic watch stub — will check open stories and raise PR to main"

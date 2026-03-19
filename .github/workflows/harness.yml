@@ -1,0 +1,31 @@
+name: Harness
+
+on:
+  create:
+
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    outputs:
+      should-run: ${{ steps.check.outputs.should-run }}
+    steps:
+      - id: check
+        run: |
+          if [[ "${{ github.ref_name }}" == story/* ]] || \
+             [[ "${{ github.ref_name }}" == fix/* ]]; then
+            echo "should-run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should-run=false" >> $GITHUB_OUTPUT
+          fi
+
+  harness:
+    needs: check-branch
+    if: needs.check-branch.outputs.should-run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Harness stub
+        run: |
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Harness stub — agent session will run here"
+          echo "Story branch detected, pipeline is wired correctly"

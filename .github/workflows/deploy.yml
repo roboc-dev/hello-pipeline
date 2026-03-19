@@ -1,0 +1,22 @@
+name: Deploy
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  deploy-nonprod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy stub
+        run: echo "Deploy stub — nonprod deployment will run here"
+
+  deploy-prod:
+    needs: deploy-nonprod
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy stub
+        run: echo "Deploy stub — prod deployment will run here"
