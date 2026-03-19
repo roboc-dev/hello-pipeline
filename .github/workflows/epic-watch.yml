@@ -4,13 +4,97 @@ on:
   pull_request:
     branches: ['epic/*']
     types: [closed]
+  workflow_dispatch:
 
 jobs:
   check-epic-complete:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      pull-requests: write
+      contents: read
     steps:
-      - name: Epic watch stub
+      - uses: actions/checkout@v4
+
+      - name: Get epic branch name
+        id: epic
         run: |
-          echo "Story merged to epic branch"
-          echo "Epic watch stub — will check open stories and raise PR to main"
+          echo "branch=${{ github.event.pull_request.base.ref }}" >> $GITHUB_OUTPUT
+          # Extract slug from epic/hello-validation → hello-validation
+          SLUG="${{ github.event.pull_request.base.ref }}"
+          SLUG="${SLUG#epic/}"
+          echo "slug=$SLUG" >> $GITHUB_OUTPUT
+
+      - name: Find linked epic issue
+        id: find-epic
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find open epic issues by label
+          EPIC_NUMBER=$(gh issue list \
+            --label "type: epic" \
+            --state open \
+            --json number,title \
+            --jq '.[0].number')
+          echo "epic-number=$EPIC_NUMBER" >> $GITHUB_OUTPUT
+          echo "Found epic issue: $EPIC_NUMBER"
+
+      - name: Check open stories
+        id: check-stories
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EPIC_NUMBER=${{ steps.find-epic.outputs.epic-number }}
+          
+          # Count open issues linked to this epic
+          OPEN_COUNT=$(gh issue list \
+            --label "type: story" \
+            --label "status: ready" \
+            --state open \
+            --json number \
+            --jq 'length')
+          
+          echo "open-count=$OPEN_COUNT" >> $GITHUB_OUTPUT
+          echo "Open stories remaining: $OPEN_COUNT"
+
+      - name: Raise PR to main if epic complete
+        if: steps.check-stories.outputs.open-count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EPIC_BRANCH=${{ steps.epic.outputs.branch }}
+          SLUG=${{ steps.epic.outputs.slug }}
+          
+          # Check a PR doesn't already exist
+          EXISTING=$(gh pr list \
+            --head "$EPIC_BRANCH" \
+            --base main \
+            --json number \
+            --jq 'length')
+          
+          if [ "$EXISTING" -eq "0" ]; then
+            gh pr create \
+              --base main \
+              --head "$EPIC_BRANCH" \
+              --title "feat: $SLUG — epic complete" \
+              --body "All stories complete. Auto-raised by epic-watch workflow.
+
+          ## Stories merged
+          $(gh pr list --state merged --base "$EPIC_BRANCH" --json number,title \
+            --jq '.[] | "- #\(.number) \(.title)"')
+          
+          ## Checklist
+          - [ ] Review changes
+          - [ ] Confirm nonprod deployment after merge"
+          
+            echo "PR raised from $EPIC_BRANCH to main"
+          else
+            echo "PR already exists, skipping"
+          fi
+
+      - name: Log if stories still open
+        if: steps.check-stories.outputs.open-count != '0'
+        run: |
+          echo "${{ steps.check-stories.outputs.open-count }} stories still open"
+          echo "Epic PR will be raised when all stories are merged"
